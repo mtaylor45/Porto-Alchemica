@@ -1,0 +1,74 @@
+# Home Assistant automations for the MagicBand porch reader.
+#
+# Prereqs:
+#   1. Tap each band once. HA creates a Tag entity under Settings > Tags.
+#      Rename them there and copy the tag IDs into the list below.
+#   2. Nest x Yale is NOT exposed by the official Nest (SDM) integration.
+#      Install a HACS custom integration that reaches it over the Nest
+#      protobuf API, e.g. krozgrov/ha-nest-yale-integration or Nest Legacy.
+#      Set your lock entity below once it exists.
+
+# ---------------------------------------------------------------- helpers
+# Put this in configuration.yaml (or via the UI) to control whether the
+# reader is live. Lets you disable band entry while away, at night, etc.
+input_boolean:
+  magicband_entry_enabled:
+    name: MagicBand Entry Enabled
+    icon: mdi:hand-wave
+
+# ---------------------------------------------------------------- automations
+automation:
+  - alias: "MagicBand — approved band unlocks front door"
+    mode: single
+    triggers:
+      - trigger: tag
+        tag_id:
+          - REPLACE_WITH_MIKES_BAND_ID
+          - REPLACE_WITH_SECOND_BAND_ID
+    conditions:
+      - condition: state
+        entity_id: input_boolean.magicband_entry_enabled
+        state: "on"
+      # Optional extra gate: only when someone is home or nearby.
+      # - condition: state
+      #   entity_id: person.mike
+      #   state: home
+    actions:
+      - action: lock.unlock
+        target:
+          entity_id: lock.front_door        # <- your Nest x Yale entity
+      - action: esphome.magicband_porch_feedback_success
+      # Nice touch: announce or light the entry.
+      # - action: light.turn_on
+      #   target: { entity_id: light.foyer }
+
+  - alias: "MagicBand — unknown or blocked band"
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: tag_scanned
+    conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.tag_id not in [
+               'REPLACE_WITH_MIKES_BAND_ID',
+               'REPLACE_WITH_SECOND_BAND_ID' ]
+             or is_state('input_boolean.magicband_entry_enabled', 'off') }}
+    actions:
+      - action: esphome.magicband_porch_feedback_denied
+      - action: persistent_notification.create
+        data:
+          title: MagicBand denied
+          message: "Unrecognized or blocked tap: {{ trigger.event.data.tag_id }}"
+
+  - alias: "MagicBand — auto relock after entry"
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: lock.front_door
+        to: unlocked
+    actions:
+      - delay: "00:01:30"
+      - action: lock.lock
+        target:
+          entity_id: lock.front_door

@@ -1,0 +1,114 @@
+# Example zone node: mmWave presence -> MagicBand+ haptic ping.
+# Drop the magicband_beacon folder into <esphome config>/components/
+#
+# Replace the payload hex with codes validated against your own bands.
+# Capture them from the community list or by sniffing the Flipper app's
+# advertisement, then test each one with nRF Connect before trusting it.
+
+substitutions:
+  zone: bookcase
+  friendly: Bookcase
+
+esphome:
+  name: beacon-${zone}
+  friendly_name: ${friendly} Beacon
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+logger:
+api:
+  encryption:
+    key: !secret api_encryption_key
+  actions:
+    # Let HA fire any pattern on demand, for testing and for scripted moments.
+    - action: ping
+      variables:
+        pattern: string
+      then:
+        - lambda: |-
+            // Route to the scripts below by name.
+            if (pattern == "nearby") { id(ping_nearby).execute(); }
+            else if (pattern == "granted") { id(ping_granted).execute(); }
+            else if (pattern == "denied") { id(ping_denied).execute(); }
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble:
+
+magicband_beacon:
+  id: band
+  # -12 dBm keeps the burst to roughly a meter or two. Raise only if the
+  # band consistently misses it from where people actually stand.
+  tx_power: -12
+
+# ---------------------------------------------------------------- presence
+
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+ld2410:
+
+binary_sensor:
+  - platform: ld2410
+    has_target:
+      name: "${friendly} Presence"
+      id: zone_presence
+      filters:
+        - delayed_off: 10s
+      on_press:
+        then:
+          # Cooldown so walking past twice doesn't buzz twice.
+          - if:
+              condition:
+                lambda: 'return millis() - id(last_ping) > 60000;'
+              then:
+                - script.execute: ping_nearby
+                - lambda: 'id(last_ping) = millis();'
+
+globals:
+  - id: last_ping
+    type: uint32_t
+    initial_value: '0'
+
+# ---------------------------------------------------------------- patterns
+# One vocabulary, reused at every zone, so the meaning stays learnable.
+
+script:
+  - id: ping_nearby
+    then:
+      - magicband_beacon.send:
+          id: band
+          payload: "00112233445566"   # placeholder: soft single pulse
+          duration: 3s
+
+  - id: ping_granted
+    then:
+      - magicband_beacon.send:
+          id: band
+          payload: "00112233445566"   # placeholder: green confirm
+          duration: 2s
+
+  - id: ping_denied
+    then:
+      - magicband_beacon.send:
+          id: band
+          payload: "00112233445566"   # placeholder: red reject
+          duration: 2s

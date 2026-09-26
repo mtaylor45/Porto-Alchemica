@@ -1,0 +1,176 @@
+# MagicBand Touch Point — ESPHome config
+# ESP32 + PN532 (SPI) + WS2812 ring + DFPlayer Mini
+#
+# WIRING (ESP32 devkit):
+#   PN532 (set DIP switches to SPI mode per silkscreen)
+#     SCK  -> GPIO18    MISO -> GPIO19    MOSI -> GPIO23    SS/CS -> GPIO5
+#     VCC  -> 3.3V      GND  -> GND
+#   WS2812 ring (24 px, 5V + level shifter or 470R on data)
+#     DIN  -> GPIO13    5V -> 5V rail     GND -> common GND
+#   DFPlayer Mini (UART, 5V)
+#     RX   <- GPIO17 through a 1k resistor
+#     TX   -> GPIO16
+#     SPK_1 / SPK_2 -> 3W 4ohm speaker
+#   Give the LED ring + DFPlayer their own 5V supply (2A+). Common ground with the ESP32.
+
+substitutions:
+  device_name: magicband-porch
+  friendly: MagicBand Porch
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly}
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: idle_glow
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  # ESPHome 2025.5+ calls these "actions"; older versions use "services:".
+  actions:
+    - action: feedback_success
+      then:
+        - script.execute: success_pulse
+    - action: feedback_denied
+      then:
+        - script.execute: denied_pulse
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "MagicBand Porch Fallback"
+
+captive_portal:
+
+# ---------------------------------------------------------------- NFC
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+pn532_spi:
+  cs_pin: GPIO5
+  update_interval: 0.4s
+  on_tag:
+    then:
+      # Instant local feedback so the tap feels responsive, no HA round trip.
+      - script.execute: reading_pulse
+      # Fires the tag_scanned event in Home Assistant. Name each band in the HA UI.
+      - homeassistant.tag_scanned: !lambda 'return x;'
+  on_tag_removed:
+    then:
+      - script.execute: idle_glow
+
+# ---------------------------------------------------------------- Light
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: ring
+    name: "Touch Point Ring"
+    pin: GPIO13
+    num_leds: 24
+    chipset: WS2812
+    rgb_order: GRB
+    default_transition_length: 120ms
+    effects:
+      - pulse:
+          name: breathe
+          transition_length: 1.2s
+          update_interval: 1.2s
+
+# ---------------------------------------------------------------- Audio
+# Load the SD card with:
+#   0001.mp3 = the two-note "bum-bum" success chime
+#   0002.mp3 = the low buzz / denied tone
+
+dfplayer:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  on_finished_playback:
+    then:
+      - logger.log: "chime finished"
+
+# ---------------------------------------------------------------- Scripts
+
+script:
+  # Idle: slow blue breathing, like the park touch points.
+  - id: idle_glow
+    mode: restart
+    then:
+      - light.turn_on:
+          id: ring
+          red: 0%
+          green: 30%
+          blue: 100%
+          brightness: 45%
+          effect: breathe
+
+  # Tag seen, waiting on Home Assistant to decide.
+  - id: reading_pulse
+    mode: restart
+    then:
+      - light.turn_on:
+          id: ring
+          effect: none
+          red: 100%
+          green: 70%
+          blue: 0%
+          brightness: 90%
+
+  # HA approved: green flash + chime, then back to idle.
+  - id: success_pulse
+    mode: restart
+    then:
+      - dfplayer.set_volume: 22
+      - dfplayer.play: 1
+      - light.turn_on:
+          id: ring
+          effect: none
+          red: 0%
+          green: 100%
+          blue: 20%
+          brightness: 100%
+      - delay: 3s
+      - script.execute: idle_glow
+
+  # HA rejected: red, buzz, back to idle.
+  - id: denied_pulse
+    mode: restart
+    then:
+      - dfplayer.set_volume: 22
+      - dfplayer.play: 2
+      - light.turn_on:
+          id: ring
+          effect: none
+          red: 100%
+          green: 0%
+          blue: 0%
+          brightness: 100%
+      - delay: 2s
+      - script.execute: idle_glow
+
+# ---------------------------------------------------------------- Extras
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 120s
+
+binary_sensor:
+  - platform: status
+    name: "Status"

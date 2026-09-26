@@ -1,0 +1,43 @@
+Ref,Qty,Value,Package,Manufacturer Part,Variant,Notes
+U1,1,ESP32-WROOM-32UE-N8,Module,ESP32-WROOM-32UE-N8,Both,External antenna version - see spec 1.2
+U2,1,TPS562201,SOT-23-6,TPS562201DDCR,Both,5V to 3.3V 2A sync buck
+U3,1,74AHCT125,SOIC-14,SN74AHCT125N or SMD equiv,Both,Powered from 5V not 3.3V
+U4,1,MAX98357A module,Castellated breakout,MAX98357A breakout,Both,Footprint the module not the bare TDFN
+Q1,1,P-MOSFET,SOT-23,DMG2301L,Both,Reverse polarity protection
+Q2,1,NPN,SOT-23,MMBT3904,Both,Auto-reset
+Q3,1,NPN,SOT-23,MMBT3904,Both,Auto-reset
+D1,1,TVS 5V,SMA,SMAJ5.0A,Exterior,DNP on interior
+F1,1,PTC 2A,1812,MF-MSMF200,Both,Resettable
+L1,1,2.2uH 3A,4x4mm shielded,SRN4018-2R2M,Both,Saturation current matters
+C1,1,470uF 10V,Radial 8mm,-,Both,Input bulk - tallest part on board
+C7,1,1000uF 10V,Radial 10mm,-,Both,Across LED rail at J2
+C3,1,10uF 25V,0805 X5R,-,Both,Buck input
+C4,1,10uF 25V,0805 X5R,-,Both,Buck input
+C5,1,22uF 6.3V,0805 X5R,-,Both,Buck output
+C6,1,22uF 6.3V,0805 X5R,-,Both,Buck output
+C8-C16,9,100nF,0402 X7R,-,Both,One per IC supply pin within 2mm
+C17,1,10uF 6.3V,0805 X5R,-,Both,Local to PN532 3V3 after ferrite
+FB1,1,600R at 100MHz,0603,BLM18PG601SN1,Both,PN532 supply isolation
+R1,1,100k 1%,0402,-,Both,Buck feedback high
+R2,1,31.6k 1%,0402,-,Both,Buck feedback low - sets 3.30V
+R3,1,470R,0402,-,Both,LED data series
+R4,1,10k,0402,-,Both,AMP_SD pulldown - also satisfies GPIO2 strap
+R5,1,100k,0402,-,Both,MAX98357A gain select to GND = 12dB
+R6,1,100k,0402,-,Both,Q1 gate
+R7,1,10k,0402,-,Both,EN pullup
+R8,1,10k,0402,Interior,LCD_BL pulldown
+R9,1,10k,0402,Interior,LCD_RST pullup
+R10,2,5.1k,0402,Interior,USB-C CC pulldowns
+SW1,1,Tactile 3.2mm,SMD,-,Both,BOOT
+SW2,1,Tactile 3.2mm,SMD,-,Both,EN / reset
+J1a,1,Screw terminal 2P,5.08mm,-,Exterior,5V input
+J1b,1,USB-C 16P,SMD,TYPE-C-31-M-12,Interior,Power only
+J2,1,JST-XH 3P,2.5mm,B3B-XH-A,Both,LED ring
+J3,1,JST-XH 8P,2.5mm,B8B-XH-A,Both,PN532 module
+J4,1,JST-PH 2P,2.0mm,B2B-PH-K-S,Both,Speaker
+J5,1,JST-XH 5P,2.5mm,B5B-XH-A,Both,LD2410C
+J6,1,JST-SH 8P,1.0mm,SM08B-SRSS-TB,Interior,GC9A01 display
+J7,1,Pin header 6P,2.54mm,-,Both,Programming
+J8,1,JST-SH 4P,1.0mm,SM04B-SRSS-TB,Both,I2C expansion / Qwiic
+ANT1,1,u.FL connector,SMD,U.FL-R-SMT-1,Both,Plus pigtail and 2.4GHz antenna
+PCB,1,70mm circle 4-layer,-,-,Both,1oz JLC7628 stackup
